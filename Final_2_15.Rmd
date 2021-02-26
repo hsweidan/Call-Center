@@ -1,0 +1,921 @@
+---
+author: "HSO"
+date: "`r format(Sys.Date(), '%m/%d/%y')`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 6
+    toc_float:
+      collapsed: true
+    fig_width: 7
+    fig_height: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{css, echo = FALSE, warning = FALSE, message = FALSE}
+
+    body .main-container {
+      max-width: 1280px !important;
+      width: 1280px !important;
+    }
+    body {
+      max-width: 1280px !important;
+    }
+```
+
+```{r set-options, echo=FALSE, cache=FALSE}
+options(width = 50)
+```
+ 
+```{r Install and load libraries}
+#Install and load necessary packages --------------------
+#install.packages("readraw_dfl")
+#install.packages("writeraw_dfl")
+#install.packages("lubridate")
+#install.packages("dplyr")
+#install.packages("reshape2")
+#install.packages("svDialogs")
+#install.packages("stringr")
+#install.packages("formattable")
+# #install.packages("ggpubr")
+# #install.packages("yaml")
+# install.packages("tidyverse", dependencies = TRUE)
+# install.packages('ggplot2', dependencies = TRUE)
+# install.packages('data.table', dependencies = TRUE)
+# install.packages("ggplot2", type="binary")
+# install.packages("choroplethr", dependencies=TRUE)
+# install.packages("readxl")
+# install.packages("anytime")
+# install.packages('backports')
+# install.packages('rmarkdown')
+# install.packages("tinytex")
+# install.packages("kableExtra")
+# install.packages("lattice")
+
+#Analysis for weekend discharge tracking
+
+library(ggplot2)
+library(tidyverse)
+library(data.table)
+library(readxl)
+library (writexl)
+library(choroplethr)
+library(choroplethrMaps)
+library(anytime)
+library(dplyr)
+library(lubridate)
+library(tcltk)
+library(chron)
+library(tinytex)
+library(formattable)
+library(reshape2)
+library(svDialogs)
+library(stringr)
+library(scales)
+library(ggpubr)
+library(knitr)
+library(kableExtra)
+library(rmarkdown)
+library(yaml)
+library(googlesheets4)
+library(lattice)
+
+
+
+```
+
+
+```{r mapping, echo = FALSE, warning = FALSE, message = FALSE}
+# rm(list = ls())
+# 
+# script_path <- dirname(rstudioapi::getActiveDocumentContext()$path)
+# setwd(script_path)
+# 
+# user_wd <- getwd()
+# 
+# user_path <- paste0(user_wd, "\\*.*")
+
+```
+
+```{r Custom functions for Sinai color schemes}
+### Color Functions for Graphs ============================================================
+
+# Mount Sinai corporate colors "USE THIS TO ADD COLORS"
+MountSinai_colors <- c(
+  `dark purple`  = "#212070",
+  `dark pink`    = "#d80b8c",
+  `dark blue`    = "#00aeef",
+  `dark grey`    = "#7f7f7f",
+  `yellow`       = "#ffc000",
+  `purple`       = "#7030a0",
+  `med purple`   = "#5753d0",
+  `med pink`     = "#f75dbe",
+  `med blue`     = "#5cd3ff",
+  `med grey`     = "#a5a7a5",
+  `light purple` = "#c7c6ef",
+  `light pink`   = "#fcc9e9",
+  `light blue`   = "#c9f0ff",
+  `light grey`   = "#dddedd"
+)
+
+# Function to extract Mount Sinai colors as hex codes
+# Use Character names of MountSinai_colors
+
+MountSinai_cols <- function(...) {
+  cols <- c(...)
+  
+  if (is.null(cols))
+    return (MountSinai_colors)
+  
+  MountSinai_colors[cols]
+}
+
+# Color Function that can be used to call all colors is "MountSinai_cols()"
+# Use in ggplot 
+
+#MountSinai_cols()       # will provide all colors and their hex codes in a table 
+#MountSinai_cols("pink") # will provide color name and the hex code for the pink color
+
+# Create palettes 
+MountSinai_palettes <- list(
+  `all`   = MountSinai_cols("dark purple","dark pink","dark blue","dark grey",
+                            "med purple","med pink","med blue","med grey", 
+                            "light purple","light pink","light blue","light grey"),
+  
+  `main`  = MountSinai_cols("dark purple","dark pink","dark blue","dark grey"),
+  
+  `purple`  = MountSinai_cols("dark purple","med purple","light purple"),
+  
+  `pink`  = MountSinai_cols("dark pink","med pink","light pink"),
+  
+  `blue`  = MountSinai_cols("dark blue", "med blue", "light blue"),
+  
+  `grey`  = MountSinai_cols("dark grey", "med grey", "light grey"),
+  
+  `purpleGrey` = MountSinai_cols("dark purple", "dark grey"),
+  
+  `pinkBlue` = MountSinai_cols("dark pink", "dark blue")
+  
+)
+
+# MountSinai_palettes
+# Return function to interpolate a Mount Sinai color palette
+# default value is the main palette, reverse = True will change the order
+
+MountSinai_pal <- function(palette = "all", reverse = FALSE, ...) {
+  pal <- MountSinai_palettes[[palette]]
+  
+  if (reverse) pal <- rev(pal)
+  
+  colorRampPalette(pal, ...)
+}
+
+
+
+# Scale Function for ggplot can be used instead of scale_color_manual
+scale_color_MountSinai <- function(palette = "all", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- MountSinai_pal(palette = palette, reverse = reverse)
+  
+  if (discrete) {
+    discrete_scale("colour", paste0("MountSinai_", palette), palette = pal, ...)
+  } else {
+    scale_color_gradientn(colours = pal(256), ...)
+  }
+}
+
+# Scale Fill for ggplot insetead of scale_fill_manual 
+scale_fill_MountSinai <- function(palette = "all", discrete = TRUE, reverse = FALSE, ...) {
+  pal <- MountSinai_pal(palette = palette, reverse = reverse)
+  
+  if (discrete) {
+    discrete_scale("fill", paste0("MountSinai_", palette), palette = pal, ...)
+  } else {
+    scale_fill_gradientn(colours = pal(256), ...)
+  }
+}
+
+# Use in ggplot 
+# scale_color_MountSinai("main")
+
+
+```
+
+
+```{r Import data files, include=FALSE}
+
+# Change working directory to folder with Data reports
+setwd("J:\\deans\\Presidents\\HSPI-PM\\Operations Analytics and Optimization\\Projects\\Service Lines\\Call Center\\Code\\Working Data Files")
+
+# Pull cisco data
+#data.raw <- as.data.frame(read.csv(file.choose(),skip=1))
+#data.raw <- read.csv(file = "Raw Report CSV.csv", skip=1)
+
+# Pull Directory
+# phone.directory <- read_excel(file.choose(),sheet = "Master Grid",col_names = TRUE, na = c("", "NA"))
+
+# Import all cisco UCCE data files
+
+raw_data_path <- "J:\\deans\\Presidents\\HSPI-PM\\Operations Analytics and Optimization\\Projects\\Service Lines\\Call Center\\Data\\Cisco Data"
+
+data.list <- list.files(path= raw_data_path, full.names=TRUE, recursive = TRUE,pattern = "*CSQ*")
+
+data.list <- data.list[-1]
+cisco_raw <- lapply(data.list,function(filename){
+  print(paste("Merging",filename,sep = " "))
+  read_excel(filename, col_names = TRUE, na = c("", "NA"))
+})
+
+#Merge Raw Data 
+merged_raw <- do.call(rbind.data.frame, cisco_raw)
+        
+# Import all cisco PCCE data files
+getwd()
+pcc_data <- read_excel("halareport1025-1030.xlsx",col_names = TRUE, na = c("", "NA"))
+
+peri_type <- read_excel("PCC Reference.xlsx",sheet = "Peri Type",col_names = TRUE, na = c("", "NA"))
+
+full_dispo_type <-  read_excel("PCC Reference.xlsx",sheet = "Full Dispo Type",col_names = TRUE, na = c("", "NA"))
+
+dispo_type <- read_excel("PCC Reference.xlsx",sheet = "Dispo Type",col_names = TRUE, na = c("", "NA"))
+```
+
+```{r Pre-Process Data, warning=TRUE, include=FALSE}
+
+# # Edit Called Numbers to get last 5 digits only
+# unique(merged_raw$`Called Number`)
+# 
+# 
+# n_last <- 5                                
+# merged_raw$` Edited Called Number` <- substr(merged_raw$`Called Number`, nchar(merged_raw$`Called Number`) - n_last + 1, nchar(merged_raw$`Called Number`))
+# 
+# # merged_raw$` Edited Called Number` <- ifelse(nchar(merged_raw$`Called Number`) > 6, (merged_raw$` Edited Called Number` <- substr(merged_raw$`Called Number`, 5, 10)),(merged_raw$` Edited Called Number` <- merged_raw$`Called Number`))
+# 
+# # merged_raw$` Edited Called Number` <- ifelse(nchar(merged_raw$`Called Number`) > 5, (merged_raw$` Edited Called Number` <- substr(merged_raw$`Called Number`, 2, 6)),(merged_raw$` Edited Called Number` <- merged_raw$`Called Number`))
+# 
+# unique(merged_raw$` Edited Called Number`)
+# 
+# # Edit Directory Numbers to get last 5 digits only
+# phone.directory$`Main Practice Phone Number`<- gsub("[[:punct:][:blank:]]","",phone.directory$`Main Practice Phone Number`)
+# 
+# phone.directory <- transform(phone.directory, phone1 = substr(`Main Practice Phone Number`, 1, 10), phone2 = substr(`Main Practice Phone Number`, 11, 20), phone3 = substr(`Main Practice Phone Number`, 21, 30), phone4 = substr(`Main Practice Phone Number`, 31, 40), phone5 = substr(`Main Practice Phone Number`, 41, 50), phone6 = substr(`Main Practice Phone Number`, 51, 60))
+# 
+# phone.directory$phone1 <- substr(phone.directory$phone1, 6, 10)
+# phone.directory$phone2 <- substr(phone.directory$phone2, 6, 10)
+# phone.directory$phone3 <- substr(phone.directory$phone3, 6, 10)
+# phone.directory$phone4 <- substr(phone.directory$phone4, 6, 10)
+# phone.directory$phone5 <- substr(phone.directory$phone5, 6, 10)
+# phone.directory$phone6 <- substr(phone.directory$phone6, 6, 10)
+# 
+# # Select columns to merge with cisco data
+# phone.summary <- phone.directory %>% 
+#   select(Site.Campus:Zipcode,Main.Practice.Phone.Number,phone1:phone6)
+# 
+# phone.summary$new.practice.name <- ifelse(is.na(phone.summary$Practice.Name), phone.summary$Legacy.Practice.Name,phone.summary$Practice.Name)
+# 
+# 
+# # Make a row for each phone number
+# phone.summary.melt <- melt(phone.summary, na.rm = TRUE, drop = TRUE, id.vars = "new.practice.name", measure.vars = c("phone1","phone2","phone3","phone4","phone5","phone6"))
+# 
+# phone.summary.melt <- phone.summary.melt[-which(phone.summary.melt$value==""),]
+
+# str(phone.summary.melt)
+# str(merged_raw)
+# write.csv(phone.summary.melt,"phone directory summary.csv")
+# write.csv(merged_raw,"merged cisco data.csv")
+
+## Pre-processing UCCE Data
+merged_raw <- as.data.frame(merged_raw)
+# Merge data to get name office name
+# 
+# merged.data <- merge(phone.summary.melt,merged_raw, by.x = c("value"), by.y = c(" Edited Called Number"),all.y = TRUE)
+
+# [5.1] Remove Blanks & Extra Columns
+colnames(merged_raw)
+
+colnames(merged_raw) <- c("Node.Session.ID", "Call.Start.Time", "Call.End.Time",
+                           "Contact.Disposition", "Calling.Number", "Destination.DN",
+                           "Called.Number", "Application.Name", "CSQ.Names", "Queue.Time",
+                           "Agent.Name", "Ring.Time", "Talk.Time", "Work.Time")
+
+keep.cols <- c("Node.Session.ID","Call.Start.Time",
+               "Call.End.Time","Contact.Disposition", "Calling.Number", "Destination.DN",
+               "Called.Number", "Application.Name", "CSQ.Names", "Queue.Time","Agent.Name",
+               "Ring.Time", "Talk.Time","Work.Time")
+
+data.subset <- merged_raw%>%
+  select(Node.Session.ID,Call.Start.Time,
+               Call.End.Time,Contact.Disposition, Calling.Number, Destination.DN,
+               Called.Number, Application.Name, CSQ.Names, Queue.Time,Agent.Name,
+               Ring.Time, Talk.Time, Work.Time)
+  
+data.subset <- data.subset[!is.na(data.subset$CSQ.Names),]
+
+# [5.2] Remove duplicates in the data --------------------------------------------------------------------
+
+# New subset data with duplicates removed
+data.subset.new <- data.subset %>% distinct()
+
+
+# [5.3] Correct columns Format --------------------------------------------------------------------
+
+# str(data.subset.new)
+# data.subset.new$Call.Start.Time <- as.POSIXct(as.character(data.subset.new$Call.Start.Time), format= "%m/%d/%Y %H:%M")
+# data.subset.new$Call.End.Time <- as.POSIXct(as.character(data.subset.new$Call.End.Time), format= "%m/%d/%Y %H:%M")
+# data.subset.new$Queue.Time <- as.POSIXct(as.character(data.subset.new$Queue.Time),format= "%m/%d/%Y %H:%M")
+# data.subset.new$Ring.Time <- as.POSIXct(as.character(data.subset.new$Ring.Time),format= "%m/%d/%Y %H:%M")
+# data.subset.new$Talk.Time <- as.POSIXct(as.character(data.subset.new$Talk.Time),format= "%m/%d/%Y %H:%M")
+
+data.subset.new$Contact.Disposition <- as.factor(data.subset.new$Contact.Disposition)
+data.subset.new$Called.Number <- as.factor(data.subset.new$Called.Number)
+data.subset.new$Destination.DN <- as.factor(data.subset.new$Destination.DN)
+
+
+
+# [5.4] Change Disposition Number to Description
+
+# Disposition.Legend <- as.data.frame(read.csv(choose.files(caption = "Select Disposition Legend")))
+# str(Disposition.Legend)
+
+Disposition.Legend <- as.data.frame(read.csv("Disposition Legend.csv"))
+
+data.subset.final <- merge(data.subset.new,Disposition.Legend, by.x = "Contact.Disposition", by.y = "Code")
+# str(data.subset.final)
+
+# [5.4] Change extension Number to Service Area Name
+# Phone.Extensions <- as.data.frame(read.csv(choose.files(caption = "Select Phone Extensions")))
+# str(Phone.Extensions)
+
+Phone.Extensions <- as.data.frame(read.csv("Phone Extensions.csv"))
+
+data.subset.final <- merge(data.subset.final,Phone.Extensions, by.x = "Called.Number", by.y = "Edited.Called.Number")
+
+
+# [5.5] Add Month and Day Columns
+
+## Create date-year column
+data.subset.final$Call.DateYear <- format(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), "%Y-%m-%d")
+
+## Create month - year column
+data.subset.final$Call.MonthYear <- format(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), "%b-%Y")
+
+## Create date column
+data.subset.final$Call.Date <- format(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), "%m-%d")
+
+## Create year column
+data.subset.final$Call.Year <- format(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), "%Y")
+
+## Create month colunm
+data.subset.final$Call.Month <- format(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), "%b")
+
+## Create Week Column
+data.subset.final$Call.Week <- floor_date(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), unit="week")
+
+## Create day of week colunm
+data.subset.final$Call.Day <- format(as.Date(data.subset.final$Call.Start.Time, format="%m/%d/%Y"), "%a")
+
+## remove aborted 
+data.subset.final <- data.subset.final[data.subset.final$Description!= "Aborted",]
+
+#create handle time
+data.subset.final$handle.time.minute <- ifelse(is.na(data.subset.final$Work.Time),minute(data.subset.final$Talk.Time),( minute(data.subset.final$Talk.Time) + minute(data.subset.final$Work.Time)))
+
+data.subset.final$handle.time.second <- ifelse(is.na(data.subset.final$Work.Time),second(data.subset.final$Talk.Time),( second(data.subset.final$Talk.Time) + second(data.subset.final$Work.Time)))
+
+data.subset.final$handle.time <- round(data.subset.final$handle.time.minute + (data.subset.final$handle.time.second/60),1)
+
+#Queue time in seconds
+
+data.subset.final$wait.time.second <- 
+ifelse(is.na(data.subset.final$Ring.Time),second(data.subset.final$Queue.Time),( second(data.subset.final$Queue.Time) + second(data.subset.final$Ring.Time)))
+
+data.subset.final$wait.time.minute <- ifelse(is.na(data.subset.final$Ring.Time),minute(data.subset.final$Queue.Time),( minute(data.subset.final$Queue.Time) + minute(data.subset.final$Ring.Time)))
+
+data.subset.final$wait.time <- data.subset.final$wait.time.second + (data.subset.final$wait.time.minute*60)
+
+data.subset.final$service.met <- ifelse(data.subset.final$wait.time < 31,"Yes", "No")
+
+
+ # write_xlsx(data.subset.final,"FinalData.xlsx")
+
+## Pre-processing PCCE Data
+colnames(pcc_data)
+str(pcc_data)
+
+pcc_data$uniqueID <- paste(pcc_data$RouterCallKeyDay,pcc_data$RecoveryKey)
+
+pcc_data_new <- merge(pcc_data, peri_type, by.x = "PeripheralCallType", by.y = "Code")
+
+pcc_data_new <- merge(pcc_data_new, full_dispo_type, by.x = "CallDisposition", by.y = "Code")
+
+pcc_data_new <- merge(pcc_data_new, dispo_type, by.x = "CallDispositionFlag", by.y = "Code")
+
+pcc_data_agg <- pcc_data_new %>% 
+  group_by(uniqueID) %>% 
+  summarize(sum_duration = sum(Duration),sum_ringtime = sum(RingTime),
+            sum_delaytime = sum(DelayTime),sum_timetoaband =
+              sum(TimeToAband),sum_holdtime = sum(HoldTime),sum_talktime = 
+              sum(TalkTime),sum_worktime = sum(WorkTime),sum_localqtime = 
+              sum(LocalQTime),)
+
+
+
+colnames(merged_raw) <- c("Node.Session.ID", "Call.Start.Time", "Call.End.Time",
+                           "Contact.Disposition", "Calling.Number", "Destination.DN",
+                           "Called.Number", "Application.Name", "CSQ.Names", "Queue.Time",
+                           "Agent.Name", "Ring.Time", "Talk.Time", "Work.Time")
+
+keep.cols <- c("Node.Session.ID","Call.Start.Time",
+               "Call.End.Time","Contact.Disposition", "Calling.Number", "Destination.DN",
+               "Called.Number", "Application.Name", "CSQ.Names", "Queue.Time","Agent.Name",
+               "Ring.Time", "Talk.Time","Work.Time")
+
+data.subset <- merged_raw%>%
+  select(Node.Session.ID,Call.Start.Time,
+               Call.End.Time,Contact.Disposition, Calling.Number, Destination.DN,
+               Called.Number, Application.Name, CSQ.Names, Queue.Time,Agent.Name,
+               Ring.Time, Talk.Time, Work.Time)
+  
+data.subset <- data.subset[!is.na(data.subset$CSQ.Names),]
+
+```
+
+
+```{r Sinai Logo, echo=FALSE, out.width = '30%'}
+knitr::include_graphics("Mount_Sinai_Logo_H.png")
+```
+
+# MSHS Call Center Dashboard
+
+Data Range: December1 - December 31, 2019 *<br/>
+___________________________________________________________________________________________________________
+
+
+<br/>
+
+```{r MSHS main tab,fig.width=10, echo = FALSE, warning = FALSE, message = FALSE, results="asis"}
+
+
+# [6.2] Call Volume by Practice
+ggplot(data.subset.final, aes(fill= Practice, x=Call.Week)) + 
+  geom_bar(position="stack", stat="count",width = 4)+
+  scale_fill_MountSinai("main",10)+
+  ggtitle("Weekly Call Volume by Location")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust=0.5, face = "bold", size = 16),
+        legend.position = "right",
+        legend.text = element_text(size="10"),
+        legend.direction = "vertical",
+        legend.key.size = unit(0.5,"cm"),
+        legend.title = element_blank(),
+        axis.title = element_text(size="14"),
+        axis.text = element_text(size="14"),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(angle = 90,hjust = 0.5, margin = margin(t=10)),
+        axis.text.y = element_text(margin = margin(l=5, r=5)),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        plot.margin = margin(30,30,30,30))
+
+# [6.2] Handeled vs Abandoned
+ggplot(data.subset.final, aes(fill= Description, x=Call.Week )) + 
+  geom_bar(position="stack", stat="count", width = 4)+
+  scale_fill_MountSinai("main",3)+
+  ggtitle("Weekly System Handled vs Abandoned Calls")+
+  theme_bw()+ xlab ("Week")+
+  theme(plot.title = element_text(hjust=0.5, face = "bold", size = 16),
+        legend.position = "right",
+        legend.text = element_text(size="10"),
+        legend.direction = "vertical",
+        legend.key.size = unit(0.5,"cm"),
+        legend.title = element_blank(),
+        axis.title = element_text(size="14"),
+        axis.text = element_text(size="14"),
+        axis.text.x = element_text(angle = 90,hjust = 0.5, margin = margin(t=10)),
+        axis.text.y = element_text(margin = margin(l=5, r=5)),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        plot.margin = margin(30,30,30,30)) 
+
+# Calculate Average call handling time 
+handle_time_df <- data.subset.final %>% 
+  select(Practice,Description, Call.Week,handle.time)
+
+handle_time_df <- handle_time_df[handle_time_df$Description == "Handled",]
+
+#*******check why 0 talk time*****************************************************
+handle_time_df <- handle_time_df[handle_time_df$handle.time > 0,]
+
+handle_time_table <- dcast(data = handle_time_df, Practice ~ Call.Week , fun = mean)
+handle_time_table[,-1] <- round(handle_time_table[,-1],1)
+
+# Display Avge call handle time Table 
+ handle_time_table %>% 
+        
+    kable(format = "html", escape = FALSE, align = "l",
+          col.names =c("Practice","Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+    row_spec(row = 0, background = "#221f72", color = "white") %>%
+    add_header_above(c("Weekly Average Call Handle Time (min)" = length(handle_time_table)),
+                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+    collapse_rows(columns = 1, valign = "top") %>%
+    footnote(number = c("'NA' indicates no available data")) %>%
+   column_spec(1:3, width = "2 cm")
+
+# calculate average weekly abandoned rate 
+avg_abandond_df <- data.subset.final %>% 
+  select(Practice,Description, Call.Week)
+
+avg_abandond_df <- dcast(data = avg_abandond_df, Practice + Call.Week ~ Description, margins = c( "Description"))
+
+avg_abandond_df$Percent_Abandond <-(avg_abandond_df$Abandoned/avg_abandond_df$`(all)`)*100
+avg_abandond_df$Percent_Abandond <- round(avg_abandond_df$Percent_Abandond,0)
+abandoned_table <- avg_abandond_df %>%
+  select(Practice, Call.Week, Percent_Abandond)
+
+abandoned_table <- dcast(data = abandoned_table, Practice ~ Call.Week)
+
+# Display abandoned Table 
+
+col_aband <- ncol(abandoned_table)
+positions_aband <- 2:col_aband
+   
+abandoned_table %>% 
+   select(positions_aband) %>%
+   mutate_all(~cell_spec(.x, color = case_when(.x > 15 ~ "red",(.x <= 15 &.x > 10) ~"orange", (.x <= 10 &.x > 5) ~ "gold", .x <= 5 ~ "green", is.na(.x) ~ "grey"))) %>%
+   mutate(Practice = abandoned_table$Practice) %>%
+   select(Practice,everything()) %>%
+      kable(format = "html", escape = FALSE, align = "l",
+          col.names =c("Practice","Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+    row_spec(row = 0, background = "#221f72", color = "white") %>%
+    add_header_above(c("Weekly Abandoned Rate (%) - Benchmark: less than 5%" = length(abandoned_table)),
+                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+    collapse_rows(columns = 1, valign = "top") %>%
+    footnote(number = c("'NA' indicates no available data")) %>%
+   column_spec(1:3, width = "2 cm")
+ 
+
+ # Service Level and ASA Calcultion
+ service_level_df <- data.subset.final %>% 
+  select(Practice,Description, Call.Week, wait.time,service.met)
+
+ service_level_df <- service_level_df[service_level_df$Description == "Handled",]
+
+
+service_level_cast <- dcast(data = service_level_df, Practice + Call.Week ~ service.met, margins = c("service.met"))
+
+service_level_cast$percent_met <- round(service_level_cast$Yes/service_level_cast$`(all)`*100,0)
+service_table <- dcast(data = service_level_cast, Practice ~ Call.Week, value.var = "percent_met")
+# str(service_table)
+
+avg_time_answer <- dcast(data = service_level_df, Practice ~ Call.Week , fun.aggregate = mean, value.var = "wait.time")
+
+avg_time_answer[,-1] <- round(avg_time_answer[,-1],0)
+
+#Average spead to abandon Calculation
+abandoned_wait_df <- data.subset.final %>% 
+  select(Practice,Description, Call.Week, wait.time,service.met)
+
+ abandoned_wait_df <- abandoned_wait_df[abandoned_wait_df$Description == "Abandoned",]
+ 
+ avg_abandond_wait <- dcast(data = abandoned_wait_df, Practice ~ Call.Week , fun.aggregate = mean, value.var = "wait.time")
+
+avg_abandond_wait[,-1] <- round(avg_abandond_wait[,-1],0)
+
+
+# Display Service Level Table 
+ col_serv <- ncol(service_table)
+positions_ser <- 2:col_serv
+   
+service_table %>% 
+  select(positions_ser) %>%
+   mutate_all(~cell_spec(.x, color = case_when(.x < 50 ~ "red",(.x >= 50 &.x < 70) ~"orange", (.x >= 70 &.x < 80) ~ "gold", .x >= 80 ~ "green", is.na(.x) ~ "grey"))) %>%
+   mutate(Practice = service_table$Practice) %>%
+   select(Practice,everything()) %>%
+  
+    kable(format = "html", escape = FALSE, align = "l",
+          col.names =c("Practice","Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+    row_spec(row = 0, background = "#221f72", color = "white") %>%
+    add_header_above(c("Weekly Service Level (%) - Benchmark: 80% within 30 Sec" = length(service_table)),
+                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+    collapse_rows(columns = 1, valign = "top") %>%
+    footnote(number = c("'NA' indicates no available data")) %>%
+   column_spec(1:3, width = "2 cm")
+ 
+ # Display ASA Table 
+ 
+avg_time_answer %>% 
+    kable(format = "html", escape = FALSE, align = "l",
+          col.names =c("Practice","Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+    row_spec(row = 0, background = "#221f72", color = "white") %>%
+    add_header_above(c("Average Spead to Answer (sec)" = length(avg_time_answer)),
+                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+    collapse_rows(columns = 1, valign = "top") %>%
+    footnote(number = c("'NA' indicates no available data")) %>%
+   column_spec(1:3, width = "2 cm")
+
+ # Display Avg abandoned wait Table 
+ 
+avg_abandond_wait %>% 
+  
+    kable(format = "html", escape = FALSE, align = "l",
+          col.names =c("Practice","Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+    row_spec(row = 0, background = "#221f72", color = "white") %>%
+    add_header_above(c("Average Time to Abandon (sec)" = length(avg_abandond_wait)),
+                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+    collapse_rows(columns = 1, valign = "top") %>%
+    footnote(number = c("'NA' indicates no available data")) %>%
+   column_spec(1:3, width = "2 cm")
+
+```
+
+<br/>
+
+```{r Functions for seperate sites graphs and tables,warning=TRUE}
+
+# prepare data for tables
+handle_time_table1 <- handle_time_table
+handle_time_table1$metric <- "Average Call Handle Time (min)"
+
+abandoned_table1 <- abandoned_table
+abandoned_table1$metric <- "Abandoned Rate (%)"
+
+service_table1 <- service_table
+service_table1$metric <- "Service Level (%)"
+
+avg_time_answer1 <- avg_time_answer
+avg_time_answer1$metric <- "Average Speed to Answer Time (sec)"
+
+avg_abandond_wait1 <- avg_abandond_wait
+avg_abandond_wait1$metric <- "Average Time to Abandon (sec)"
+
+practice_table <- rbind(handle_time_table1, avg_time_answer1, avg_abandond_wait1)
+
+
+# Abandoned vs Handled Calls
+
+Abandoned_vs_Handled_function <- function(call_center) {
+  
+  call_center_name <- call_center
+
+  call_center_name <- "Mount Sinai Doctors Manhasset"
+
+  volume_data <- data.subset.final %>%
+    filter(Practice == call_center_name)
+
+  # Bar Graph ---------------
+  # Abandoned vs Handled
+
+  volume_breakdown <- 
+    ggplot(volume_data, aes(fill= Description, x=Call.Week )) + 
+  geom_bar(position="stack", stat="count",width = 4)+
+  scale_fill_MountSinai("main",3)+
+  ggtitle("Handled vs Abandoned Calls")+
+  theme_bw()+ xlab ("Week")+
+  theme(plot.title = element_text(hjust=0.5, face = "bold", size = 16),
+        legend.position = "right",
+        legend.text = element_text(size="10"),
+        legend.direction = "vertical",
+        legend.key.size = unit(0.5,"cm"),
+        legend.title = element_blank(),
+        axis.title = element_text(size="14"),
+        axis.text = element_text(size="14"),
+        axis.text.x = element_text(angle = 90,hjust = 0.5, margin = margin(t=10)),
+        axis.text.y = element_text(margin = margin(l=5, r=5)),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        plot.margin = margin(30,30,30,30)) 
+
+  print(volume_breakdown)
+  
+#Prepare Practice Abandoned Rate graph
+  
+    abandoned_data <- abandoned_table %>%
+      filter(Practice == call_center_name)
+    
+    transpose_abd <- t(abandoned_data)
+    transpose_abd <- transpose_abd[-1,]
+
+    transpose_abd  <- as.data.frame(transpose_abd )
+    setDT(transpose_abd ,keep.rownames = TRUE)
+
+    colnames(transpose_abd ) <- c("Week","Abandoned Rate (%)")
+    transpose_abd $`Abandoned Rate (%)`<- as.double(as.character(transpose_abd $`Abandoned Rate (%)`))
+    transpose_abd $`Abandoned Rate (%)`<- transpose_abd $`Abandoned Rate (%)`/100
+
+    transpose_abd $Week <- as.Date(transpose_abd $Week)
+    transpose_abd $Week <- format(transpose_abd $Week, "%b %d")
+    
+    transpose_abd$Category <- ifelse(transpose_abd$`Abandoned Rate (%)`<= 0.05,"green",ifelse(transpose_abd$`Abandoned Rate (%)` >0.05 & transpose_abd$`Abandoned Rate (%)` <= 0.1 , "yellow", ifelse(transpose_abd$`Abandoned Rate (%)` > 0.1 & transpose_abd$`Abandoned Rate (%)` <= 0.15,"orange", "red")))
+    
+
+# Display abandoned Graph
+
+  practice_abandonded <- 
+  ggplot(transpose_abd ,aes(y=`Abandoned Rate (%)`, x= Week, group = 1)) + 
+  geom_line()+
+   geom_point(aes(colour = factor(Category)),size = 3) +
+    scale_color_manual(values = c("red"="red2",
+                                  "orange" = "dark orange",
+                                  "yellow" = "gold", 
+                                  "green" ="forest green"),
+                       breaks = c("green","yellow","orange","red"),
+                     labels = c("Abandoned Rate <= 5%", 
+                                  "5% < Abandoned Rate <= 10%",
+                                  "10% < Abandoned Rate <= 15%",
+                                  "Abandoned Rate >= 15%"))+
+  geom_hline(yintercept=0.05, linetype="dashed", color = "red", size = 1)+
+  scale_y_continuous(labels = percent_format(), limits=c(0,0.5))+
+  ggtitle("Practice Abandoned Rate Trend (%)")+
+  theme_bw()+ xlab ("Week")+ ylab("Abandoned Rate (%)")+
+  theme(plot.title = element_text(hjust=0.5, face = "bold", size = 16),
+        legend.position = "right",
+        legend.text = element_text(size="10"),
+        legend.direction = "vertical",
+        legend.key.size = unit(0.5,"cm"),
+        legend.title = element_blank(),
+        axis.title = element_text(size="14"),
+        axis.text = element_text(size="14"),
+        axis.text.x = element_text(angle = 90,hjust = 0.5, margin = margin(t=10)),
+        axis.text.y = element_text(margin = margin(l=5, r=5)),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        plot.margin = margin(30,30,30,30)) 
+
+  print(practice_abandonded)
+ 
+#Prepare Practice Service Level graph
+  
+    service_data <- service_table %>%
+      filter(Practice == call_center_name)
+    
+    transpose_ser <- t(service_data)
+    transpose_ser <- transpose_ser[-1,]
+
+    transpose_ser <- as.data.frame(transpose_ser)
+    setDT(transpose_ser,keep.rownames = TRUE)
+
+    colnames(transpose_ser) <- c("Week","Service Level (%)")
+    transpose_ser$`Service Level (%)`<- as.double(as.character(transpose_ser$`Service Level (%)`))
+     transpose_ser$`Service Level (%)`<-  transpose_ser$`Service Level (%)`/100
+
+    transpose_ser$Week <- as.Date(transpose_ser$Week)
+    transpose_ser$Week <- format(transpose_ser$Week, "%b %d")
+    
+    transpose_ser$Category <- ifelse(transpose_ser$`Service Level (%)`< 0.5,"red",ifelse(transpose_ser$`Service Level (%)` >=0.5 & transpose_ser$`Service Level (%)` < 0.7 , "orange", ifelse(transpose_ser$`Service Level (%)` >=0.7 & transpose_ser$`Service Level (%)` < 0.8,"yellow", "green")))
+   
+   #  str(transpose_ser)
+   # is.numeric(transpose_ser$`Service Level (%)`)
+# Display Service Graph
+  practice_service <- 
+  ggplot(transpose_ser,aes(y=`Service Level (%)`, x= Week, group = 1)) + 
+  geom_line()+
+  geom_point(aes(colour = factor(Category)),size = 3) +
+    scale_color_manual(values = c("red"="red2",
+                                  "orange" = "dark orange",
+                                  "yellow" = "gold", 
+                                  "green" ="forest green"),
+                       breaks = c("green","yellow","orange","red"),
+                       labels = c("Service Level >= 80%",
+                                  "70% <= Service Level < 80%",
+                                  "50% <= Service Level < 70%",
+                                  "Service Level < 50%"))+
+  geom_hline(yintercept=0.8, linetype="dashed", color = "red", size =1)+
+  scale_y_continuous(labels = percent_format(), limits=c(0,1))+
+  ggtitle("Practice Service Level Trend (%)")+
+  theme_bw()+ xlab ("Week")+ ylab ("Service Level (%)")+
+  theme(plot.title = element_text(hjust=0.5, face = "bold", size = 16),
+        legend.position = "right",
+        legend.text = element_text(size="10"),
+        legend.direction = "vertical",
+        legend.key.size = unit(0.5,"cm"),
+        legend.title = element_blank(),
+        axis.title = element_text(size="14"),
+        axis.text = element_text(size="14"),
+        axis.text.x = element_text(angle = 90,hjust = 0.5, margin = margin(t=10)),
+        axis.text.y = element_text(margin = margin(l=5, r=5)),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        plot.margin = margin(30,30,30,30)) 
+
+  
+print(practice_service)
+  
+  #Display practice other metric table  
+
+  
+col_practice <- ncol(practice_table)
+positions_practice <- 2:col_practice
+     
+  
+  practice_data <- practice_table %>%
+    filter(Practice == call_center_name) %>%
+    select(positions_practice) %>%
+    select(metric, everything())
+   
+ practice_tables <-  practice_data %>% 
+          
+    kable(format = "html", escape = FALSE, align = "l",
+          col.names =c("Metric","Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+    row_spec(row = 0, background = "#221f72", color = "white") %>%
+    add_header_above(c("Practice Key Performance Indicators (KPI)" = length(practice_data)),
+                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+    collapse_rows(columns = 1, valign = "top") %>%
+    footnote(number = c("'NA' indicates no available data")) %>%
+   column_spec(1:3, width = "2 cm")
+ 
+ print(practice_tables)
+  
+ 
+ # #formatted practice metric table
+ #  practice_data <- practice_table %>%
+ #    filter(Practice == call_center_name) %>%
+ #    select(positions_practice) %>%
+ #    select(metric, everything())%>%
+ #    mutate(metric = rownames(metric))
+ #  
+ #  transpose_data <- t(practice_data)
+ #  transpose_data <- as.data.frame(transpose_data)
+ #   
+ # practice_tables <-  practice_data %>% 
+ #   mutate(~cell_spec(.x, color = ifelse(rownames(practice_data) == "Service Level (%)", (case_when((.x < 50) ~ "red",(.x >= 50 &.x < 70) ~ "orange", (.x >= 70 &.x < 80) ~ "gold", .x >= 80 ~ " green", is.na(.x) ~ "grey")),"black" ))) 
+ #          
+ #    kable(format = "html", escape = FALSE, align = "l",
+ #          col.names =c("Dec 02", "Dec 09", "Dec 16", "Dec 23", "Dec 30")) %>%
+ #    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "center", font_size = 14, full_width = T) %>%
+ #    row_spec(row = 0, background = "#221f72", color = "white") %>%
+ #    add_header_above(c("Practice Key Performance Indicators (KPI)" = length(practice_data)),
+ #                       background = "#221f72", color = "white", font_size = 16, align = "center") %>%
+ #    collapse_rows(columns = 1, valign = "top") %>%
+ #    footnote(number = c("'NA' indicates no available data")) %>%
+ #   column_spec(1:3, width = "2 cm")
+ # 
+ # 
+ # print(practice_tables)
+
+  
+
+ #  #example format
+ 
+ 
+# Conditional recode using case_when  with  grepl and value matching %in% 
+# 
+# Goal: recode if  it is a Mercedes and it has 4 or 6 to 8  cylinders using  mtcars data.  
+# 
+# if the car is a Mercedes Merc has 4 cyl  Merc68 will get value  No, 
+# if the car is a Merc has 6 to 8 cyl  Merc68 will get value Yes, 
+# all other cars will get value Other 
+# 
+# mtcars %>% 
+#   rownames_to_column() %>% 
+#         mutate(Merc68 = case_when( (cyl %in% c(6, 8) & grepl("Merc ", rownames(mtcars)) == TRUE) ~ "Yes",
+#                                  ( cyl == 4 & grepl("Merc", rownames(mtcars)) == TRUE)           ~ "No",
+#                                  TRUE                                                            ~ "Other"))
+# cyl %in% c(6, 8) as axample of using %in% this case can be replaced with  cyl &gt; 5
+
+    }
+
+```
+
+<br/>
+
+```{r MSHS Graphs and Tables Output, fig.width=10 , echo = FALSE, warning = FALSE, message = FALSE, results="asis"}
+
+  call_centers <- unique(data.subset.final$Practice)
+  call_centers <- as.vector(call_centers)
+  
+  # sites <- c("59Southern", "175EMainSt Access Center", "175EMainSt Billing", "Hewlett", "150E42ndSt HR", "150E42ndSt HR Benefits", "150E42ndSt PhysAccessCtr", "150E42ndSt Hunter Ambulance", "JacksonHeights", "9901QueensBlvd" )
+
+    for (i in call_centers) {
+
+  cat(" \n##", i,"\n")
+
+  Abandoned_vs_Handled_function(call_center = i)
+  
+  cat(" \n")
+
+  }
+  
+
+```
+
+
