@@ -413,32 +413,67 @@ pcc_data_new <- merge(pcc_data_new, full_dispo_type, by.x = "CallDisposition", b
 
 pcc_data_new <- merge(pcc_data_new, dispo_type, by.x = "CallDispositionFlag", by.y = "Code")
 
+# Add Month and Day Columns
+
+## Create date-year column
+pcc_data_new$Call.DateYear <- format(as.Date(pcc_data_new$DateTime, format="%m/%d/%Y"), "%Y-%m-%d")
+
+## Create month - year column
+pcc_data_new$Call.MonthYear <- format(as.Date(dpcc_data_new$DateTime, format="%m/%d/%Y"), "%b-%Y")
+
+## Create date column
+pcc_data_new$Call.Date <- format(as.Date(pcc_data_new$DateTime, format="%m/%d/%Y"), "%m-%d")
+
+## Create year column
+pcc_data_new$Call.Year <- format(as.Date(pcc_data_new$DateTime, format="%m/%d/%Y"), "%Y")
+
+## Create month colunm
+pcc_data_new$Call.Month <- format(as.Date(pcc_data_new$DateTime, format="%m/%d/%Y"), "%b")
+
+## Create Week Column
+pcc_data_new$Call.Week <- floor_date(as.Date(pcc_data_new$DateTime, format="%m/%d/%Y"), unit="week")
+
+## Create day of week colunm
+pcc_data_new$Call.Day <- format(as.Date(pcc_data_new$DateTime, format="%m/%d/%Y"), "%a")
+
+colnames(pcc_data_new)
+
+# Group same call data 
 pcc_data_agg <- pcc_data_new %>% 
-  group_by(uniqueID) %>% 
+  group_by(uniqueID, Variable1, Variable2, Variable3, Variable4, NewTransaction,
+           Variable8,NetQTime,peri_desc, full_dispo_desc, dispo_desc.x, dispo_desc.y,
+           Call.DateYear, Call.Date, Call.Year, Call.Month, Call.Week, Call.Day) %>% 
   summarize(sum_duration = sum(Duration),sum_ringtime = sum(RingTime),
             sum_delaytime = sum(DelayTime),sum_timetoaband =
               sum(TimeToAband),sum_holdtime = sum(HoldTime),sum_talktime = 
               sum(TalkTime),sum_worktime = sum(WorkTime),sum_localqtime = 
-              sum(LocalQTime),)
+              sum(LocalQTime),sum_netqtime = 
+              sum(NetQTime))
+
+pcc_data_agg$handle.time <- round(sum(pcc_data_agg$sum_talktime,
+                                                pcc_data_agg$sum_worktime)/60,1)
+
+pcc_data_agg$wait.time <- round(sum(pcc_data_agg$sum_ringtime,
+                                     pcc_data_agg$sum_delaytime,
+                                     pcc_data_agg$sum_localqtime,
+                                     pcc_data_agg$sum_netqtime)/60,1)
 
 
+pcc_data_agg$service.met <- ifelse(pcc_data_agg$wait.time < 31,"Yes", "No")
 
-colnames(merged_raw) <- c("Node.Session.ID", "Call.Start.Time", "Call.End.Time",
-                           "Contact.Disposition", "Calling.Number", "Destination.DN",
-                           "Called.Number", "Application.Name", "CSQ.Names", "Queue.Time",
-                           "Agent.Name", "Ring.Time", "Talk.Time", "Work.Time")
 
-keep.cols <- c("Node.Session.ID","Call.Start.Time",
-               "Call.End.Time","Contact.Disposition", "Calling.Number", "Destination.DN",
-               "Called.Number", "Application.Name", "CSQ.Names", "Queue.Time","Agent.Name",
-               "Ring.Time", "Talk.Time","Work.Time")
+colnames(pcc_data_agg) <- c("uniqueID","Calling.Number","Called.Number",
+                            "Practice","Language", "NewTransaction",
+                            "Application.Name", "NetQTime",  "peri_desc", 
+                            "full_dispo_desc", "Description",
+                            "dispo_desc.y","Call.DateYear", "Call.Date" ,
+                            "Call.Year", "Call.Month", "Call.Week", 
+                            "Call.Day", "sum_duration","sum_ringtime" ,
+                            "sum_delaytime", "sum_timetoaband", "sum_holdtime" , 
+                            "sum_talktime", "sum_worktime", "sum_localqtime" , 
+                            "sum_netqtime", "handle.time.minute", "wait.time.second")
 
-data.subset <- merged_raw%>%
-  select(Node.Session.ID,Call.Start.Time,
-               Call.End.Time,Contact.Disposition, Calling.Number, Destination.DN,
-               Called.Number, Application.Name, CSQ.Names, Queue.Time,Agent.Name,
-               Ring.Time, Talk.Time, Work.Time)
-  
+
 data.subset <- data.subset[!is.na(data.subset$CSQ.Names),]
 
 ```
